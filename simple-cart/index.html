@@ -724,6 +724,9 @@
     .as-sep { height: 1px; background: var(--color-border); margin: 4px 0; }
     .as-cancel { color: var(--color-text-secondary); }
 
+    /* Prevent iOS Safari input zoom on manage view forms (requires font-size >= 16px) */
+    .inline-form .form-input { font-size: 16px; }
+
     /* ============================================================
        Print
     ============================================================ */
@@ -1407,11 +1410,8 @@ function closeActionSheet() {
 
 function saveAsPDF() {
   closeActionSheet();
-  const pad = n => String(n).padStart(2, '0');
-  const now = new Date();
-  const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   const prev = document.title;
-  document.title = `receipt-${ts}`;
+  document.title = `receipt-${getTimestamp()}`;
   setTimeout(() => {
     window.print();
     setTimeout(() => { document.title = prev; }, 2000);
@@ -1423,13 +1423,10 @@ async function saveAsImage() {
   const card = document.getElementById('receipt-card');
   try {
     const canvas = await html2canvas(card, { scale: 2, useCORS: true });
-    const pad = n => String(n).padStart(2, '0');
-    const now = new Date();
-    const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const a = document.createElement('a');
-    a.download = `receipt-${ts}.png`;
-    a.href = canvas.toDataURL('image/png');
-    a.click();
+    const filename = `receipt-${getTimestamp()}.png`;
+    canvas.toBlob(async (blob) => {
+      await shareOrDownload(blob, filename);
+    }, 'image/png');
   } catch(e) {
     console.error('Screenshot failed:', e);
   }
@@ -1604,18 +1601,40 @@ function updateLangBtns() {
 }
 
 /* ============================================================
-   Export / Import
+   Utilities
 ============================================================ */
-function exportData() {
+function getTimestamp() {
   const pad = n => String(n).padStart(2, '0');
   const now = new Date();
-  const date = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+// Web Share API with <a download> fallback
+async function shareOrDownload(blob, filename) {
+  const file = new File([blob], filename, { type: blob.type });
+  const isTouchDevice = navigator.maxTouchPoints > 1;
+  if (isTouchDevice && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // user cancelled share sheet
+      // fall through to download fallback
+    }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = t('exportFilename', date);
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* ============================================================
+   Export / Import
+============================================================ */
+async function exportData() {
+  const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+  await shareOrDownload(blob, t('exportFilename', getTimestamp()));
 }
 
 function triggerImport() {
