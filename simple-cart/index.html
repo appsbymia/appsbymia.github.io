@@ -137,6 +137,7 @@
       justify-content: center;
       border-radius: 8px;
       font-size: 16px;
+      color: var(--color-text-primary);
     }
     .row-action-btn:active { background: var(--color-bg); }
     .row-action-btn:disabled { opacity: 0.2; cursor: default; }
@@ -609,6 +610,24 @@
       font-weight: 600;
     }
 
+    /* Theme color swatches */
+    .theme-swatches {
+      display: flex;
+      gap: 8px;
+    }
+    .theme-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .theme-swatch.selected {
+      box-shadow: inset 0 0 0 2.5px #fff, 0 0 0 2.5px var(--swatch-color);
+    }
+
     .data-actions {
       margin-top: 24px;
       display: flex;
@@ -943,6 +962,7 @@ const i18n = {
     cardStyleLabel:      '卡片样式',
     cardStyleClassic:    '标准',
     cardStyleMinimal:    '简洁',
+    themeColorLabel:     '主题颜色',
   },
   'en': {
     manage:              'Manage',
@@ -988,6 +1008,7 @@ const i18n = {
     cardStyleLabel:      'Card Style',
     cardStyleClassic:    'Classic',
     cardStyleMinimal:    'Minimal',
+    themeColorLabel:     'Theme Color',
   }
 };
 
@@ -997,16 +1018,25 @@ const i18n = {
 const DATA_KEY = 'pos_data';
 const CART_KEY = 'pos_cart';
 
+const THEMES = {
+  orange: { accent: '#FF8C00', accentLight: '#FFF3E8' },
+  green:  { accent: '#2E7D32', accentLight: '#E8F5E9' },
+  blue:   { accent: '#0A72B7', accentLight: '#E3F2FB' },
+  brown:  { accent: '#8A5F41', accentLight: '#F4ECE6' },
+  black:  { accent: '#212121', accentLight: '#F0F0F0' },
+};
+
 function loadData() {
   try {
     const raw = localStorage.getItem(DATA_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      if (!data.cardStyle) data.cardStyle = 'classic'; // migration default
+      if (!data.cardStyle) data.cardStyle = 'classic';
+      if (!data.themeColor) data.themeColor = 'orange';
       return data;
     }
   } catch(e) {}
-  return { language: 'zh-hans', cardStyle: 'classic', stores: [] };
+  return { language: 'zh-hans', cardStyle: 'classic', themeColor: 'orange', stores: [] };
 }
 
 function saveData() {
@@ -1287,6 +1317,20 @@ function renderManageView() {
 
     html += `</div>`; // store-block
   }
+
+  // Theme color
+  const themeColor = appData.themeColor || 'orange';
+  html += `
+    <div class="settings-row">
+      <span class="settings-row-label">${t('themeColorLabel')}</span>
+      <div class="theme-swatches">
+        ${Object.entries(THEMES).map(([key, theme]) =>
+          `<button class="theme-swatch${key === themeColor ? ' selected' : ''}"
+            style="background:${theme.accent};--swatch-color:${theme.accent}"
+            onclick="setThemeColor('${key}')"></button>`
+        ).join('')}
+      </div>
+    </div>`;
 
   // Card style toggle
   const cardStyle = appData.cardStyle || 'classic';
@@ -1684,7 +1728,21 @@ function setLang(lang) {
 function setCardStyle(style) {
   appData.cardStyle = style;
   saveData();
-  renderManageView(); // re-render to update toggle active state
+  renderManageView();
+}
+
+function applyTheme() {
+  const theme = THEMES[appData.themeColor] || THEMES.orange;
+  const s = document.documentElement.style;
+  s.setProperty('--color-accent', theme.accent);
+  s.setProperty('--color-accent-light', theme.accentLight);
+}
+
+function setThemeColor(key) {
+  appData.themeColor = key;
+  saveData();
+  applyTheme();
+  renderManageView();
 }
 
 function updateLangBtns() {
@@ -1745,10 +1803,12 @@ function handleImport(event) {
       if (!confirm(t('confirmImport'))) return;
       appData = parsed;
       if (!appData.language) appData.language = 'zh-hans';
+      if (!appData.themeColor) appData.themeColor = 'orange';
       saveData();
       cart = null;
       saveCart();
       initCart();
+      applyTheme();
       expandedStoreId = appData.stores.length === 1 ? appData.stores[0].id : null;
       editingStoreId = null;
       editingProductId = null;
@@ -1788,6 +1848,7 @@ document.addEventListener('click', (e) => {
 /* ============================================================
    Init
 ============================================================ */
+applyTheme();
 initCart();
 showView('main');
 </script>
