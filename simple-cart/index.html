@@ -961,7 +961,7 @@ const i18n = {
     asCancel:            '取消',
     cardStyleLabel:      '卡片样式',
     cardStyleClassic:    '标准',
-    cardStyleMinimal:    '简洁',
+    cardStyleSimple:     '简洁',
     themeColorLabel:     '主题颜色',
   },
   'en': {
@@ -1007,7 +1007,7 @@ const i18n = {
     asCancel:            'Cancel',
     cardStyleLabel:      'Card Style',
     cardStyleClassic:    'Classic',
-    cardStyleMinimal:    'Minimal',
+    cardStyleSimple:     'Simple',
     themeColorLabel:     'Theme Color',
   }
 };
@@ -1026,15 +1026,17 @@ const THEMES = {
   black:  { accent: '#212121', accentLight: '#F0F0F0' },
 };
 
+function normalizeData(data) {
+  if (!['zh-hans', 'en'].includes(data.language))          data.language  = 'zh-hans';
+  if (!['classic', 'simple'].includes(data.cardStyle))     data.cardStyle = 'classic';
+  if (!Object.keys(THEMES).includes(data.themeColor))      data.themeColor = 'orange';
+  return data;
+}
+
 function loadData() {
   try {
     const raw = localStorage.getItem(DATA_KEY);
-    if (raw) {
-      const data = JSON.parse(raw);
-      if (!data.cardStyle) data.cardStyle = 'classic';
-      if (!data.themeColor) data.themeColor = 'orange';
-      return data;
-    }
+    if (raw) return normalizeData(JSON.parse(raw));
   } catch(e) {}
   return { language: 'zh-hans', cardStyle: 'classic', themeColor: 'orange', stores: [] };
 }
@@ -1196,11 +1198,11 @@ function renderMainView() {
         <button class="btn btn-primary" onclick="showView('manage')">${t('goManage')}</button>
       </div>`;
   } else {
-    const isMinimal = (appData.cardStyle || 'classic') === 'minimal';
+    const isSimple = (appData.cardStyle || 'classic') === 'simple';
     const cards = store.products.map(p => {
       const qty = cartQty(p.id);
       const inCart = qty > 0;
-      const actionsHtml = isMinimal
+      const actionsHtml = isSimple
         ? `<div class="product-card-actions">
              <button class="qty-btn-minus" style="${qty > 0 ? '' : 'visibility:hidden'}" onclick="event.stopPropagation();adjustQty('${p.id}',-1)">-</button>
              <span class="qty-display" id="qty-${p.id}" onclick="event.stopPropagation();startQtyEdit('${p.id}')">${qty}</span>
@@ -1339,7 +1341,7 @@ function renderManageView() {
       <span class="settings-row-label">${t('cardStyleLabel')}</span>
       <div class="segment-control">
         <button class="segment-btn${cardStyle === 'classic' ? ' active' : ''}" onclick="setCardStyle('classic')">${t('cardStyleClassic')}</button>
-        <button class="segment-btn${cardStyle === 'minimal' ? ' active' : ''}" onclick="setCardStyle('minimal')">${t('cardStyleMinimal')}</button>
+        <button class="segment-btn${cardStyle === 'simple' ? ' active' : ''}" onclick="setCardStyle('simple')">${t('cardStyleSimple')}</button>
       </div>
     </div>`;
 
@@ -1801,9 +1803,7 @@ function handleImport(event) {
       const parsed = JSON.parse(e.target.result);
       if (!validateImport(parsed)) { alert(t('importError')); return; }
       if (!confirm(t('confirmImport'))) return;
-      appData = parsed;
-      if (!appData.language) appData.language = 'zh-hans';
-      if (!appData.themeColor) appData.themeColor = 'orange';
+      appData = normalizeData(parsed);
       saveData();
       cart = null;
       saveCart();
